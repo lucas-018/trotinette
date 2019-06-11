@@ -64,6 +64,11 @@ ChemicalSystem::ChemicalSystem(int t_size)
 
 		m_masses.push_back(0);
 	}
+	m_image_to_show = vtkImageData::New();
+	m_image_to_show->SetDimensions(t_size, t_size, t_size);
+	m_image_to_show->AllocateScalars(VTK_FLOAT, 1);
+
+
 	m_surface = 0;
 	m_mapper = 0;
 	m_actor = 0;
@@ -82,6 +87,10 @@ ChemicalSystem::~ChemicalSystem()
 		{
 			m_buffers[i]->Delete();
 		}
+	}
+	if (m_image_to_show)
+	{
+		m_image_to_show->Delete();
 	}
 	cleanUp();
 }
@@ -144,6 +153,7 @@ void ChemicalSystem::initialize(const Field3D<float>& field_A, const Field3D<flo
 {
 	float* origin_a = static_cast<float*>(m_images[0]->GetScalarPointer());
 	float* origin_b = static_cast<float*>(m_images[1]->GetScalarPointer());
+	float* origin_show = static_cast<float*>(m_image_to_show->GetScalarPointer());
 	for (int ix = 0; ix < m_size; ++ix)
 	{
 		for (int iy = 0; iy < m_size; ++iy)
@@ -159,6 +169,13 @@ void ChemicalSystem::initialize(const Field3D<float>& field_A, const Field3D<flo
 				
 				m_masses[0] += value_a;
 				m_masses[1] += value_b;
+
+				float value_show = 0;
+				if (value_a + value_b > 0)
+				{
+					value_show = value_b / (value_a + value_b);
+				}
+				*element_at(origin_show, ix, iy, iz, m_size) = value_show;
 			}
 		}
 	}
@@ -170,7 +187,8 @@ void ChemicalSystem::connect(vtkRenderer* p_renderer, float level)
 	vtkSmartPointer<vtkNamedColors> colors = vtkSmartPointer<vtkNamedColors>::New();
 
 	m_surface = vtkContourFilter::New();
-	m_surface->SetInputData(m_images[0]);
+	//m_surface->SetInputData(m_images[0]);
+	m_surface->SetInputData(m_image_to_show);
 	m_surface->SetValue(0, level);
 	m_surface->Update();
 
@@ -270,6 +288,7 @@ void ChemicalSystem::update(float delta_t, int num_steps, Parameters params, vtk
 
 					m_masses[0] += delta_t*da;
 					m_masses[1] += delta_t*db;
+
 				}
 			}
 		}
@@ -280,13 +299,36 @@ void ChemicalSystem::update(float delta_t, int num_steps, Parameters params, vtk
 		m_images[1]->DeepCopy(m_buffers[1]);
 	}
 
+
+	float* origin_show = static_cast<float*>(m_image_to_show->GetScalarPointer());
+	float* origin_a = static_cast<float*>(m_images[0]->GetScalarPointer());
+	float* origin_b = static_cast<float*>(m_images[1]->GetScalarPointer());
+	for (int ix = 0; ix < m_size; ++ix)
+	{
+		for (int iy = 0; iy < m_size; ++iy)
+		{
+			for (int iz = 0; iz < m_size; ++iz)
+			{
+				float value_a = *element_at(origin_a, ix, iy, iz, m_size);
+				float value_b = *element_at(origin_b, ix, iy, iz, m_size);
+				float value_show = 0;
+				if (value_a + value_b > 0)
+				{
+					value_show = value_b / (value_a + value_b);
+				}
+				*element_at(origin_show, ix, iy, iz, m_size) = value_show;
+			}
+		}
+	}
+
 	float level_a = m_masses[0] / (m_size*m_size*m_size);
 	float level_b = m_masses[1] / (m_size*m_size*m_size);
 
 	cout << "Mass A = " << level_a << endl;
 	cout << "Mass B = " << level_b << endl << endl;
 
-	m_surface->SetValue(0, level_a);
+	//m_surface->SetValue(0, min(0.95, 1.5*level_a));
+	m_surface->SetValue(0, level_b/(level_a + level_b));
 	m_surface->Update();
 	m_surface->Modified();
 	p_renderer->Render();

@@ -45,9 +45,11 @@ int main(int argc, char** argv)
 /*----------------------------------------------------------------------------------
 						         INITIAL FIELDS
 -----------------------------------------------------------------------------------*/
+	string file_name_density = "E:/users/lbt10/code/test_density.fld";
+	Field3D<float> density_field = getField<float>(file_name_density);
 	
-	
-	int box_size = 30;
+	int box_size = density_field.sizeX();
+	cout << endl << "BOX SIZE : " << box_size << endl<<endl;
 
 	/*
 	A and B fields initialization
@@ -79,16 +81,22 @@ int main(int argc, char** argv)
 	/*
 	Feed field initialization
 	*/
+
+	
+
+	/*
 	params.feed = getZeroField(box_size);
 	params.feed.initElements(feed_default_value);//uniform
+	*/
 
+	params.feed = feed_default_value*density_field;
 
 
 /*----------------------------------------------------------------------------------
 							VTK RENDRING PIPELINE
 -----------------------------------------------------------------------------------*/
-	
-	int T = 180; //total period of animation / evolution
+
+	int T = 360; //total period of animation / evolution
 
 	vtkSmartPointer<vtkRenderer> renderer = vtkSmartPointer<vtkRenderer>::New();
 	vtkSmartPointer<vtkRenderWindow> ren_win = vtkSmartPointer<vtkRenderWindow>::New();

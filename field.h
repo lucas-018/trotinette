@@ -17,7 +17,7 @@ protected:
 	T* m_data;
 	int* m_copies;
 public:
-	Field3D() {}
+	Field3D() { m_data = 0; }
 	
 	Field3D(int t_size)
 		:m_size_x(t_size),
@@ -94,7 +94,6 @@ public:
 		m_size_x = field.sizeX();
 		m_size_y = field.sizeY();
 		m_size_z = field.sizeZ();
-		delete[] m_data;
 		m_data = new T[m_size_x*m_size_y*m_size_z];
 		for (int ix = 0; ix < m_size_x; ++ix)
 		{

@@ -57,6 +57,7 @@ private:
 	int m_size;//cubical box for the moment...
 	bool m_has_kernel;//false if the usual trivial laplacian kernel is used
 	Kernel3D<float> m_kernel;//laplacian kernel if defined
+	vtkImageData* m_image_to_show;
 public:
 	std::vector<vtkImageData*> m_images;//3D scalar fields for A and B species  -  TO DO: put in private
 	std::vector<vtkImageData*> m_buffers;// buffers for A and B species to use during the updating steps  - TO DO: put in private
