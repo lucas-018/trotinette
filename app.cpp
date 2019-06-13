@@ -5,6 +5,10 @@ using namespace std;
 using namespace Eigen;
 
 
+
+
+
+
 int main(int argc, char** argv)
 {
 
@@ -45,20 +49,22 @@ int main(int argc, char** argv)
 /*----------------------------------------------------------------------------------
 						         INITIAL FIELDS
 -----------------------------------------------------------------------------------*/
-	string file_name_density = "E:/users/lbt10/code/test_density.fld";
-	Field3D<float> density_field = getField<float>(file_name_density);
+
+	//string file_name_density = "E:/users/lbt10/code/test_density.fld";
+	//Field3D<float> density_field = getField<float>(file_name_density);
 	
-	int box_size = density_field.sizeX();
+	//int box_size = density_field.sizeX();
+	int box_size = 30;
 	cout << endl << "BOX SIZE : " << box_size << endl<<endl;
 
-	/*
+	/*---------------------------
 	A and B fields initialization
-	*/
+	-----------------------------*/
 
-	int n_centers = 10;//number of balls
+	int n_centers = 20;//number of balls
 	float radius = ((float)box_size) / 8.0;//radius of the balls
 	float init_level_a = 0.5;//initial level of A where it exists
-	float init_level_b = 0.4; //initial level of B where it exists
+	float init_level_b = 0.5; //initial level of B where it exists
 	float epsilon = 0.1; //noise
 
 	
@@ -78,25 +84,24 @@ int main(int argc, char** argv)
 	excludeBallsDensity(&init_field_a, centers, radius, 0.0);
 	excludeBallsDensity(&init_field_b, centers, radius, 0.0);
 
-	/*
+
+	/*-----------------------
 	Feed field initialization
-	*/
+	------------------------*/
 
 	
-
-	/*
 	params.feed = getZeroField(box_size);
 	params.feed.initElements(feed_default_value);//uniform
-	*/
-
+	
+	/*
 	params.feed = feed_default_value*density_field;
-
+	*/
 
 /*----------------------------------------------------------------------------------
 							VTK RENDRING PIPELINE
 -----------------------------------------------------------------------------------*/
 
-	int T = 360; //total period of animation / evolution
+	int T = 90; //total period of animation / evolution
 
 	vtkSmartPointer<vtkRenderer> renderer = vtkSmartPointer<vtkRenderer>::New();
 	vtkSmartPointer<vtkRenderWindow> ren_win = vtkSmartPointer<vtkRenderWindow>::New();
@@ -123,6 +128,7 @@ int main(int argc, char** argv)
 
 	ChemicalSystem chem_sys(box_size);
 	chem_sys.initialize(init_field_a, init_field_b);
+	//chem_sys.setKernel(laplacianKernel(0.6));
 
 	vtkSmartPointer<vtkAnnimationCueObserver> observer = vtkSmartPointer<vtkAnnimationCueObserver>::New();
 	observer->m_ren_win = ren_win;
@@ -133,13 +139,17 @@ int main(int argc, char** argv)
 	cue->AddObserver(vtkCommand::StartAnimationCueEvent, observer);
 	cue->AddObserver(vtkCommand::AnimationCueTickEvent, observer);
 	cue->AddObserver(vtkCommand::EndAnimationCueEvent, observer);
+	cue->AddObserver(vtkCommand::KeyPressEvent, observer);
 
-
+	
 	scene->Play();
 
 	scene->Stop();
 
+	iren->AddObserver(vtkCommand::KeyPressEvent, observer);
 	iren->Start();
+	
+
 
 	return EXIT_SUCCESS;
 }

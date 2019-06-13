@@ -111,21 +111,7 @@ public:
 	
 	Field3D(const Field3D<T>& field)
 	{
-		m_size_x = field.sizeX();
-		m_size_y = field.sizeY();
-		m_size_z = field.sizeZ();
-		m_data = new T[m_size_x*m_size_y*m_size_z];
-		for (int ix = 0; ix < m_size_x; ++ix)
-		{
-			for (int iy = 0; iy < m_size_y; ++iy)
-			{
-				for (int iz = 0; iz < m_size_z; ++iz)
-				{
-					this->setValue(ix, iy, iz, field.getValue(ix, iy, iz));
-				}
-			}
-		}
-		m_copies = new int(1);
+		this->deepCopy(field);
 	}
 
 	void setValue(int ix, int iy, int iz, T value)
@@ -237,6 +223,7 @@ class Kernel3D : public Field3D<T>
 {
 public:
 	Kernel3D() {}
+
 	Kernel3D(int t_size)
 	{
 		m_size_x = t_size;
@@ -245,6 +232,7 @@ public:
 		m_copies = new int(1);
 		m_data = new T[t_size*t_size*t_size];
 	}
+
 	~Kernel3D()
 	{
 		if (*m_copies == 1)
@@ -257,13 +245,30 @@ public:
 			m_copies -= 1;
 		}
 	}
+
 	int size()
 	{
 		return m_size_x;
 	}
 
+
+	int startIndex()const
+	{
+		return -(int)(m_size_x / 2);
+	}
+
+	int stopIndex()const
+	{
+		return m_size_x - (int)(m_size_x / 2);
+	}
+	
+	Kernel3D(const Kernel3D<T>& kernel)
+	{
+		this->deepCopy(kernel);
+	}
+
 	/*
-	defines an accessor with signed indices 
+	defines an accessor with signed indices
 	*/
 	virtual T& operator()(int relx, int rely, int relz)
 	{
@@ -318,6 +323,20 @@ Kernel3D<float> laplacianKernel(float sigma);
 oriented laplacian kernel to increase the diffusion accross one axis in particular
 */
 Kernel3D<float> laplacianLikeKernel(Eigen::Vector3f sigmas, Eigen::Vector3f orientation);
+
+
+
+/*
+very unfriendly accessors for vtkImageData elements in an image with size (size_x*size_y*size_z):
+usage:
+to access element at (ix, iy, iz),
+replace "origin" by :  static_cast<float*>(vtk_pointer->GetScalarPointer())
+
+where vtk_pointer is a vtkImageData*.
+*/
+float* element_at(float* origin, int ix, int iy, int iz, int size_x, int size_y, int size_z);
+float* element_at(float* origin, int ix, int iy, int iz, int size);
+
 
 
 #endif

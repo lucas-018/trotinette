@@ -3,52 +3,11 @@
 using namespace std;
 using namespace Eigen;
 
-/*
-float* element_at(float* origin, int ix, int iy, int iz, int size_x, int size_y, int size_z)
-{
-	int ind_x = ix;
-	if (ind_x < 0)
-	{
-		ind_x = size_x + ind_x;
-	}
-	else if (ind_x >= size_x)
-	{
-		ind_x = ind_x - size_x;
-	}
-	int ind_y = iy;
-	if (ind_y < 0)
-	{
-		ind_y = size_y + ind_y;
-	}
-	else if (ind_y >= size_y)
-	{
-		ind_y = ind_y - size_y;
-	}
-	int ind_z = iz;
-	if (ind_z < 0)
-	{
-		ind_z = size_z + ind_z;
-	}
-	else if (ind_z >= size_z)
-	{
-		ind_z = ind_z - size_z;
-	}
-	return origin + ind_x*size_y*size_z + ind_y*size_z + ind_z;
-}*/
 
-
-float* element_at(float* origin, int ix, int iy, int iz, int size_x, int size_y, int size_z)
-{
-	return origin + min(max(0, ix), size_x - 1)*size_y*size_z + min(max(0, iy), size_y - 1)*size_z + min(max(0, iz), size_z - 1);
-}
-
-float* element_at(float* origin, int ix, int iy, int iz, int size)
-{
-	return element_at(origin, ix, iy, iz, size, size, size);
-}
 
 ChemicalSystem::ChemicalSystem(int t_size)
-	:m_size(t_size)
+	:m_size(t_size),
+	m_level(0.5)
 {
 	for (int i = 0; i < 2; ++i)
 	{
@@ -114,6 +73,22 @@ void ChemicalSystem::cleanUp()
 	}
 }
 
+
+float ChemicalSystem::getLevel()const
+{
+	return m_level;
+}
+
+void ChemicalSystem::setLevel(float value)
+{
+	m_level = value;
+	cout << m_level << endl;
+	m_surface->SetValue(0, value);
+	m_surface->Update();
+	m_surface->Modified();
+}
+
+
 void ChemicalSystem::initialize(float margin)
 {
 	int start = (int)(m_size / margin);
@@ -126,16 +101,15 @@ void ChemicalSystem::initialize(float margin)
 		{
 			for (int iz = 0; iz < m_size; ++iz)
 			{
+				float value_a = 0.0;
+				float value_b = 0.0;
 				if (ix >= start && ix <= end && iy >= start && iy <= end && iz >= start && iz <= end)
 				{
-					*element_at(origin_a, ix, iy, iz, m_size) = 0.6;
-					*element_at(origin_b, ix, iy, iz, m_size) = 0.4;
+					value_a = 0.6;
+					value_b = 0.4;
 				}
-				else
-				{
-					*element_at(origin_a, ix, iy, iz, m_size) = 0.0;
-					*element_at(origin_b, ix, iy, iz, m_size) = 0.0;
-				}
+				*element_at(origin_a, ix, iy, iz, m_size) = value_a;
+				*element_at(origin_b, ix, iy, iz, m_size) = value_b;
 			}
 		}
 	}
@@ -328,7 +302,15 @@ void ChemicalSystem::update(float delta_t, int num_steps, Parameters params, vtk
 	cout << "Mass B = " << level_b << endl << endl;
 
 	//m_surface->SetValue(0, min(0.95, 1.5*level_a));
-	m_surface->SetValue(0, level_b/(level_a + level_b));
+	if (level_b > 0)
+	{
+		m_level = level_b / (level_a + level_b);
+	}
+	else
+	{
+		m_level = 0;
+	}
+	m_surface->SetValue(0, m_level);
 	m_surface->Update();
 	m_surface->Modified();
 	p_renderer->Render();
@@ -362,16 +344,34 @@ void vtkAnnimationCueObserver::SetParams(float delta_t, int num_steps, Parameter
 }
 
 
-void vtkAnnimationCueObserver::Execute(vtkObject *vtkNotUsed(caller), unsigned long eventId, void * callData)
+void vtkAnnimationCueObserver::Execute(vtkObject *caller, unsigned long eventId, void * callData)
 {
+	float level = m_chem_sys->getLevel();
+	vtkRenderWindowInteractor* iren = static_cast<vtkRenderWindowInteractor*>(caller);
+	string symbol;
 	switch (eventId)
 	{
 	case vtkCommand::StartAnimationCueEvent:
 		m_chem_sys->connect(m_renderer, 0.05);
 		break;
 	case vtkCommand::EndAnimationCueEvent:
-		(void)m_renderer;
-		m_chem_sys->cleanUp();
+		//(void)m_renderer;
+		//m_chem_sys->cleanUp();
+		break;
+	case vtkCommand::KeyPressEvent:
+		symbol = iren->GetKeySym();
+		if (symbol == "Down")
+		{
+			level = max(0.0, level - 0.01);
+			m_chem_sys->setLevel(level);
+			m_renderer->Render();
+		}
+		else if (symbol == "Up")
+		{
+			level = min(1.0, level + 0.01);
+			m_chem_sys->setLevel(level);
+			m_renderer->Render();
+		}
 		break;
 	case vtkCommand::AnimationCueTickEvent:
 		m_chem_sys->update(m_delta_t, m_num_steps, m_params, m_renderer);
@@ -379,3 +379,4 @@ void vtkAnnimationCueObserver::Execute(vtkObject *vtkNotUsed(caller), unsigned l
 	}
 	m_ren_win->Render();
 }
+

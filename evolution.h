@@ -1,5 +1,6 @@
 #ifndef DEF_EVOLUTION
 #define DEF_EVOLUTION
+#pragma once
 
 #include <iostream>
 #include "Eigen/Dense"
@@ -7,6 +8,7 @@
 #include <vector>
 
 #include "field.h"
+#include "generator.h"
 
 #include <vtkActor.h>
 #include <vtkContourFilter.h>
@@ -35,16 +37,7 @@ struct Parameters
 
 
 
-/*
-very unfriendly accessors for vtkImageData elements in an image with size (size_x*size_y*size_z):
-usage:
-to access element at (ix, iy, iz),
-replace "origin" by static_cast<float*>(vtk_pointer->GetScalarPointer())
 
-where vtk_pointer is a vtkImageData*.
-*/
-float* element_at(float* origin, int ix, int iy, int iz, int size_x, int size_y, int size_z);
-float* element_at(float* origin, int ix, int iy, int iz, int size);
 
 
 
@@ -58,9 +51,10 @@ private:
 	bool m_has_kernel;//false if the usual trivial laplacian kernel is used
 	Kernel3D<float> m_kernel;//laplacian kernel if defined
 	vtkImageData* m_image_to_show;
+	float m_level;
 public:
 	std::vector<vtkImageData*> m_images;//3D scalar fields for A and B species  -  TO DO: put in private
-	std::vector<vtkImageData*> m_buffers;// buffers for A and B species to use during the updating steps  - TO DO: put in private
+	std::vector<vtkImageData*> m_buffers;// buffers for A and B species used during the updating steps  - TO DO: put in private
 	
 	vtkContourFilter* m_surface;//isosurface
 	
@@ -71,6 +65,9 @@ public:
 	~ChemicalSystem();
 	void cleanUp();//
 	
+	float getLevel()const;
+	void setLevel(float value);
+
 	void initialize(float margin);
 	void initialize(const Field3D<float>& field_A, const Field3D<float>& field_B);//copies field_A and field_B elements into m_images[0] and m_images[1]
 	void setKernel(const Kernel3D<float>& kernel);//defines the laplacian kernel to use if different from the trivial one

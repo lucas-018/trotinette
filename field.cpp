@@ -215,3 +215,48 @@ Kernel3D<float> laplacianLikeKernel(Vector3f sigmas, Vector3f orientation)
 	return oriented_laplacian;
 }
 
+
+
+/*
+float* element_at(float* origin, int ix, int iy, int iz, int size_x, int size_y, int size_z)
+{
+int ind_x = ix;
+if (ind_x < 0)
+{
+ind_x = size_x + ind_x;
+}
+else if (ind_x >= size_x)
+{
+ind_x = ind_x - size_x;
+}
+int ind_y = iy;
+if (ind_y < 0)
+{
+ind_y = size_y + ind_y;
+}
+else if (ind_y >= size_y)
+{
+ind_y = ind_y - size_y;
+}
+int ind_z = iz;
+if (ind_z < 0)
+{
+ind_z = size_z + ind_z;
+}
+else if (ind_z >= size_z)
+{
+ind_z = ind_z - size_z;
+}
+return origin + ind_x*size_y*size_z + ind_y*size_z + ind_z;
+}*/
+
+
+float* element_at(float* origin, int ix, int iy, int iz, int size_x, int size_y, int size_z)
+{
+	return origin + min(max(0, ix), size_x - 1)*size_y*size_z + min(max(0, iy), size_y - 1)*size_z + min(max(0, iz), size_z - 1);
+}
+
+float* element_at(float* origin, int ix, int iy, int iz, int size)
+{
+	return element_at(origin, ix, iy, iz, size, size, size);
+}
