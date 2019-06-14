@@ -43,13 +43,18 @@ private:
 	std::vector<float> m_masses;//total quantities of the two species accross the volume
 	int m_size;//cubical box for the moment...
 	bool m_has_kernel;//false if the usual trivial laplacian kernel is used
+	bool m_has_semi_group;
+	bool m_vector_update;
 	Kernel3D<float> m_kernel;//laplacian kernel if defined
+	SemiGroup* m_evolution;
 	vtkImageData* m_image_to_show;
 	float m_level;
 public:
 	std::vector<vtkImageData*> m_images;//3D scalar fields for A and B species  -  TO DO: put in private
 	std::vector<vtkImageData*> m_buffers;// buffers for A and B species used during the updating steps  - TO DO: put in private
 	
+	
+
 	vtkContourFilter* m_surface;//isosurface
 	
 	vtkPolyDataMapper* m_mapper;//part of vtk pipeline - not very interesting
@@ -65,7 +70,13 @@ public:
 	void initialize(float margin);
 	void initialize(const Field3D<float>& field_A, const Field3D<float>& field_B);//copies field_A and field_B elements into m_images[0] and m_images[1]
 	void setKernel(const Kernel3D<float>& kernel);//defines the laplacian kernel to use if different from the trivial one
-	
+	void setSemiGroup(SemiGroup* t_evolution);
+
+	void setVectorUpdateOn();
+	void setVectorUpdateOff();
+
+	void computeMasses();
+
 	void connect(vtkRenderer* p_renderer, float level);//connects evolution to the vtk rendering pipeline
 	
 	void update(float delta_t, int num_steps, Parameters params, vtkRenderer *p_renderer);

@@ -54,7 +54,7 @@ int main(int argc, char** argv)
 	//Field3D<float> density_field = getField<float>(file_name_density);
 	
 	//int box_size = density_field.sizeX();
-	int box_size = 100;
+	int box_size = 30;
 	cout << endl << "BOX SIZE : " << box_size << endl<<endl;
 
 	/*---------------------------
@@ -102,7 +102,7 @@ int main(int argc, char** argv)
 							VTK RENDRING PIPELINE
 -----------------------------------------------------------------------------------*/
 
-	int T = 7200; //total period of animation / evolution
+	int T = 90; //total period of animation / evolution
 
 	vtkSmartPointer<vtkRenderer> renderer = vtkSmartPointer<vtkRenderer>::New();
 	vtkSmartPointer<vtkRenderWindow> ren_win = vtkSmartPointer<vtkRenderWindow>::New();
@@ -127,9 +127,15 @@ int main(int argc, char** argv)
 	cue->SetEndTime(T);
 	scene->AddCue(cue);
 
+	GrayScottSG evol(params.diff_a, params.diff_b, params.kill, params.feed, false);
+	evol.setTimeStep(delta_t);
+	evol.buildMatrices();
+
 	ChemicalSystem chem_sys(box_size);
 	chem_sys.initialize(init_field_a, init_field_b);
 	chem_sys.setKernel(laplacianKernel(0.6));
+	chem_sys.setSemiGroup(&evol);
+	chem_sys.setVectorUpdateOn();
 
 	vtkSmartPointer<vtkAnnimationCueObserver> observer = vtkSmartPointer<vtkAnnimationCueObserver>::New();
 	observer->m_ren_win = ren_win;

@@ -33,6 +33,8 @@ public:
 	float diffB()const;
 	float kill()const;
 	Field3D<float> feed()const;
+	void setKernel(const Kernel3D<float>& kernel);
+	Kernel3D<float> getKernel()const;
 	std::vector<float> convolve(const std::vector<float*>& data, int ix, int iy, int iz)const;
 	virtual std::vector<float> operator()(const std::vector<float*>& data, int ix, int iy, int iz)const;
 };
@@ -61,12 +63,16 @@ private:
 	Eigen::SparseMatrix<float> m_left_matrix_b;
 	Eigen::SparseMatrix<float> m_right_matrix_a;
 	Eigen::SparseMatrix<float> m_right_matrix_b;
-	Kernel3D<float> m_laplacian_kernel;
+	Eigen::ConjugateGradient<Eigen::SparseMatrix<float>, Eigen::Lower | Eigen::Upper> m_solver_a;
+	Eigen::ConjugateGradient<Eigen::SparseMatrix<float>, Eigen::Lower | Eigen::Upper> m_solver_b;
 	int m_max_iter;
 public:
 	GrayScottSG(float t_diff_a, float t_diff_b, float t_kill, const Field3D<float>& t_feed, bool t_is_explicit);
 	~GrayScottSG();
 	void setTimeStep(float delta_t);
+	void setMaxIterations(int t_max_iter);
+	void setKernel(const Kernel3D<float>& kernel);
+	Kernel3D<float> getKernel()const;
 	void buildMatrices();
 	void explicitScheme(const std::vector<float*>& former_state, std::vector<float*>& new_state)const;
 	void crankNicolsonScheme(const std::vector<float*>& former_state, std::vector<float*>& new_state)const;

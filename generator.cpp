@@ -40,7 +40,15 @@ Field3D<float> GrayScottGenerator::feed()const
 	return m_feed;
 }
 
+void GrayScottGenerator::setKernel(const Kernel3D<float>& kernel)
+{
+	m_laplacian = kernel;
+}
 
+Kernel3D<float> GrayScottGenerator::getKernel()const
+{
+	return m_laplacian;
+}
 
 vector<float> GrayScottGenerator::convolve(const vector<float*>& data, int ix, int iy, int iz)const
 {
@@ -59,7 +67,7 @@ vector<float> GrayScottGenerator::convolve(const vector<float*>& data, int ix, i
 			{
 				for (int i = 0; i < 2; ++i)
 				{
-					dd[i] += *element_at(data[i], ix + relx, iy + rely, iz + relz, m_size)*m_laplacian.getRelValue(relx, rely, relz);
+					dd[i] += *element_at(data[i], ix + relx, iy + rely, iz + relz, m_size)*m_laplacian.getRelValue(relx, rely, relz)*6;
 				}
 			}
 		}
@@ -95,11 +103,11 @@ GrayScottSG::GrayScottSG(float t_diff_a, float t_diff_b, float t_kill, const Fie
 	m_kill(t_kill),
 	m_feed(t_feed),
 	m_delta_t(1.0f),
-	m_laplacian_kernel(laplacianKernel(0.6f)),
 	m_is_explicit(t_is_explicit),
-	m_max_iter(10)
+	m_max_iter(100)
 {
 	m_generator = new GrayScottGenerator(t_diff_a, t_diff_b, t_kill, t_feed);
+	this->setKernel(laplacianKernel(0.6f));
 }
 
 GrayScottSG::~GrayScottSG()
@@ -114,11 +122,28 @@ void GrayScottSG::setTimeStep(float delta_t)
 }
 
 
+void GrayScottSG::setMaxIterations(int t_max_iter)
+{
+	m_max_iter = t_max_iter;
+}
+
+
+void GrayScottSG::setKernel(const Kernel3D<float>& kernel)
+{
+	(static_cast<GrayScottGenerator*>(m_generator))->setKernel(kernel);
+}
+
+
+Kernel3D<float> GrayScottSG::getKernel()const
+{
+	return (static_cast<GrayScottGenerator*>(m_generator))->getKernel();
+}
+
 
 void GrayScottSG::buildMatrices()
 {
 	int size = m_generator->size();
-	SparseMatrix<float> laplacian_matrix = laplacian3DMatrix(size, m_laplacian_kernel);
+	SparseMatrix<float> laplacian_matrix = laplacian3DMatrix(size, this->getKernel());
 
 	m_left_matrix_a = -0.5*m_delta_t*m_diff_a*laplacian_matrix;
 	m_left_matrix_b = -0.5*m_delta_t*m_diff_b*laplacian_matrix;
@@ -138,6 +163,12 @@ void GrayScottSG::buildMatrices()
 		m_right_matrix_a.coeffRef(k, k) += -0.5f*m_delta_t*m_feed(x_pos, y_pos, z_pos) + 1.0f;
 		m_right_matrix_b.coeffRef(k, k) += -0.5f*m_delta_t*(m_feed(x_pos, y_pos, z_pos) + m_kill) + 1.0f;
 	}
+
+	m_solver_a.compute(m_left_matrix_a);
+	m_solver_b.compute(m_left_matrix_b);
+
+	m_solver_a.setMaxIterations(m_max_iter);
+	m_solver_b.setMaxIterations(m_max_iter);
 }
 
 
@@ -151,7 +182,7 @@ void GrayScottSG::explicitScheme(const vector<float*>& former_state, vector<floa
 			for (int iz = 0; iz < size; ++iz)
 			{
 				vector<float> values = (*m_generator)(former_state, ix, iy, iz);
-				for (int k = 0; k < values.size(); ++k)
+				for (int k = 0; k < (int)values.size(); ++k)
 				{
 					*element_at(new_state[k], ix, iy, iz, size) = *element_at(former_state[k], ix, iy, iz, size) + m_delta_t*values[k];
 				}
@@ -186,14 +217,9 @@ void GrayScottSG::crankNicolsonScheme(const vector<float*>& former_state, vector
 	VectorXf right_member_b = m_right_matrix_b*former_b + interaction;
 
 
-	ConjugateGradient<SparseMatrix<float>, Lower | Upper> solver;
-	solver.setMaxIterations(m_max_iter);
+	VectorXf new_a = m_solver_a.solveWithGuess(right_member_a, former_a);//TO DO : Try "right_member_a" as a guess
 
-	solver.compute(m_left_matrix_a);
-	VectorXf new_a = solver.solveWithGuess(right_member_a, former_a);//TO DO : Try "right_member_a" as a guess
-
-	solver.compute(m_left_matrix_b);
-	VectorXf new_b = solver.solveWithGuess(right_member_b, former_b);//TO DO : Try "right_member_b" as a guess
+	VectorXf new_b = m_solver_b.solveWithGuess(right_member_b, former_b);//TO DO : Try "right_member_b" as a guess
 
 	for (int ix = 0; ix < size; ++ix)
 	{
@@ -245,6 +271,7 @@ SparseMatrix<float> laplacian3DMatrix(int size, const Kernel3D<float>& kernel)
 				{
 					int index = min(max(x_pos + relx, 0), size - 1)*size*size + min(max(y_pos + rely, 0), size - 1)*size + min(max(z_pos + relz, 0), size - 1);
 					laplacian.coeffRef(k, index) += kernel.getRelValue(relx, rely, relz);
+					laplacian.
 				}
 			}
 		}

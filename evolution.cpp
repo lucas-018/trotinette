@@ -7,6 +7,9 @@ using namespace Eigen;
 
 ChemicalSystem::ChemicalSystem(int t_size)
 	:m_size(t_size),
+	m_has_semi_group(false),
+	m_has_kernel(false),
+	m_vector_update(false),
 	m_level(0.5)
 {
 	for (int i = 0; i < 2; ++i)
@@ -31,7 +34,6 @@ ChemicalSystem::ChemicalSystem(int t_size)
 	m_surface = 0;
 	m_mapper = 0;
 	m_actor = 0;
-	m_has_kernel = false;
 }
 
 ChemicalSystem::~ChemicalSystem()
@@ -156,6 +158,46 @@ void ChemicalSystem::initialize(const Field3D<float>& field_A, const Field3D<flo
 }
 
 
+
+void ChemicalSystem::setSemiGroup(SemiGroup* t_evolution)
+{
+	m_evolution = t_evolution;
+	m_has_semi_group = true;
+}
+
+
+void ChemicalSystem::setVectorUpdateOn()
+{
+	m_vector_update = true;
+}
+
+void ChemicalSystem::setVectorUpdateOff()
+{
+	m_vector_update = false;
+}
+
+
+void ChemicalSystem::computeMasses()
+{
+	m_masses[0] = 0;
+	m_masses[1] = 0;
+	float* origin_a = static_cast<float*>(m_images[0]->GetScalarPointer());
+	float* origin_b = static_cast<float*>(m_images[1]->GetScalarPointer());
+
+	for (int ix = 0; ix < m_size; ++ix)
+	{
+		for (int iy = 0; iy < m_size; ++iy)
+		{
+			for (int iz = 0; iz < m_size; ++iz)
+			{
+				m_masses[0] += *element_at(origin_a, ix, iy, iz, m_size);
+				m_masses[1] += *element_at(origin_b, ix, iy, iz, m_size);
+			}
+		}
+	}
+}
+
+
 void ChemicalSystem::connect(vtkRenderer* p_renderer, float level)
 {
 	vtkSmartPointer<vtkNamedColors> colors = vtkSmartPointer<vtkNamedColors>::New();
@@ -206,74 +248,102 @@ void ChemicalSystem::update(float delta_t, int num_steps, Parameters params, vtk
 			break;
 		}
 
-		for (int ix = 0; ix < m_size; ++ix)
-		{
-			for (int iy = 0; iy < m_size; ++iy)
-			{
-				for (int iz = 0; iz < m_size; ++iz)
-				{
-					float value_a = *element_at(old_a, ix, iy, iz, m_size);
-					float value_b = *element_at(old_b, ix, iy, iz, m_size);
+		vector<float*> old_data;
+		old_data.push_back(old_a);
+		old_data.push_back(old_b);
 
-					float dda = 0;
-					float ddb = 0;
-					if (m_has_kernel)
+		vector<float*> new_data;
+		new_data.push_back(new_a);
+		new_data.push_back(new_b);
+
+		if (m_vector_update)
+		{
+			m_evolution->operate(old_data, new_data);
+		}
+		else
+		{
+			for (int ix = 0; ix < m_size; ++ix)
+			{
+				for (int iy = 0; iy < m_size; ++iy)
+				{
+					for (int iz = 0; iz < m_size; ++iz)
 					{
-						for (int relx = -1; relx < 2; ++relx)
+						float value_a = *element_at(old_a, ix, iy, iz, m_size);
+						float value_b = *element_at(old_b, ix, iy, iz, m_size);
+						float da = 0;
+						float db = 0;
+
+						if (m_has_semi_group)
 						{
-							for (int rely = -1; rely < 2; ++rely)
+							Generator* Q = m_evolution->getGenerator();
+							
+							vector<float> variations = (*Q)(old_data, ix, iy, iz);
+							da = variations[0];
+							db = variations[1];
+						}
+						else
+						{
+							float dda = 0;
+							float ddb = 0;
+							if (m_has_kernel)
 							{
-								for (int relz = -1; relz < 2; ++relz)
+								for (int relx = -1; relx < 2; ++relx)
 								{
-									dda += *element_at(old_a, ix + relx, iy + rely, iz + relz, m_size)*m_kernel(relx, rely, relz)*6;
-									ddb += *element_at(old_b, ix + relx, iy + rely, iz + relz, m_size)*m_kernel(relx, rely, relz) * 6;
+									for (int rely = -1; rely < 2; ++rely)
+									{
+										for (int relz = -1; relz < 2; ++relz)
+										{
+											dda += *element_at(old_a, ix + relx, iy + rely, iz + relz, m_size)*m_kernel(relx, rely, relz) * 6;
+											ddb += *element_at(old_b, ix + relx, iy + rely, iz + relz, m_size)*m_kernel(relx, rely, relz) * 6;
+										}
+									}
 								}
 							}
+							else
+							{
+								dda += *element_at(old_a, ix - 1, iy, iz, m_size);
+								dda += *element_at(old_a, ix + 1, iy, iz, m_size);
+								dda += *element_at(old_a, ix, iy - 1, iz, m_size);
+								dda += *element_at(old_a, ix, iy + 1, iz, m_size);
+								dda += *element_at(old_a, ix, iy, iz - 1, m_size);
+								dda += *element_at(old_a, ix, iy, iz + 1, m_size);
+								dda -= 6 * value_a;
+
+
+								ddb += *element_at(old_b, ix - 1, iy, iz, m_size);
+								ddb += *element_at(old_b, ix + 1, iy, iz, m_size);
+								ddb += *element_at(old_b, ix, iy - 1, iz, m_size);
+								ddb += *element_at(old_b, ix, iy + 1, iz, m_size);
+								ddb += *element_at(old_b, ix, iy, iz - 1, m_size);
+								ddb += *element_at(old_b, ix, iy, iz + 1, m_size);
+								ddb -= 6 * value_b;
+							}
+
+
+							da = params.diff_a*dda - value_a*value_b*value_b + params.feed(ix, iy, iz)*(1.0 - value_a);
+							db = params.diff_b*ddb + value_a*value_b*value_b - (params.feed(ix, iy, iz) + params.kill)*value_b;
+
 						}
+
+						da += 1e-10f;
+						db += 1e-10f;
+
+						*element_at(new_a, ix, iy, iz, m_size) = value_a + delta_t*da;
+						*element_at(new_b, ix, iy, iz, m_size) = value_b + delta_t*db;
 					}
-					else
-					{
-						dda += *element_at(old_a, ix - 1, iy, iz, m_size);
-						dda += *element_at(old_a, ix + 1, iy, iz, m_size);
-						dda += *element_at(old_a, ix, iy - 1, iz, m_size);
-						dda += *element_at(old_a, ix, iy + 1, iz, m_size);
-						dda += *element_at(old_a, ix, iy, iz - 1, m_size);
-						dda += *element_at(old_a, ix, iy, iz + 1, m_size);
-						dda -= 6 * value_a;
-
-
-						ddb += *element_at(old_b, ix - 1, iy, iz, m_size);
-						ddb += *element_at(old_b, ix + 1, iy, iz, m_size);
-						ddb += *element_at(old_b, ix, iy - 1, iz, m_size);
-						ddb += *element_at(old_b, ix, iy + 1, iz, m_size);
-						ddb += *element_at(old_b, ix, iy, iz - 1, m_size);
-						ddb += *element_at(old_b, ix, iy, iz + 1, m_size);
-						ddb -= 6 * value_b;
-					}
-					
-
-					float da = params.diff_a*dda - value_a*value_b*value_b + params.feed(ix, iy, iz)*(1.0 - value_a);
-					float db = params.diff_b*ddb + value_a*value_b*value_b - (params.feed(ix, iy, iz) + params.kill)*value_b;
-
-					da += 1e-10f;
-					db += 1e-10f;
-
-					*element_at(new_a, ix, iy, iz, m_size) = value_a + delta_t*da;
-					*element_at(new_b, ix, iy, iz, m_size) = value_b + delta_t*db;
-
-					m_masses[0] += delta_t*da;
-					m_masses[1] += delta_t*db;
-
 				}
 			}
 		}
 	}
+	
+
 	if (num_steps % 2 == 1)
 	{
 		m_images[0]->DeepCopy(m_buffers[0]);
 		m_images[1]->DeepCopy(m_buffers[1]);
 	}
 
+	this->computeMasses();
 
 	float* origin_show = static_cast<float*>(m_image_to_show->GetScalarPointer());
 	float* origin_a = static_cast<float*>(m_images[0]->GetScalarPointer());
