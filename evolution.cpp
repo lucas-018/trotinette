@@ -225,7 +225,8 @@ void ChemicalSystem::update(float delta_t, int num_steps, Parameters params, vtk
 							{
 								for (int relz = -1; relz < 2; ++relz)
 								{
-									dda += *element_at(old_a, ix + relx, iy + rely, iz + relz, m_size)*m_kernel(relx, rely, relz);
+									dda += *element_at(old_a, ix + relx, iy + rely, iz + relz, m_size)*m_kernel(relx, rely, relz)*6;
+									ddb += *element_at(old_b, ix + relx, iy + rely, iz + relz, m_size)*m_kernel(relx, rely, relz) * 6;
 								}
 							}
 						}

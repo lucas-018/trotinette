@@ -246,7 +246,7 @@ public:
 		}
 	}
 
-	int size()
+	int size()const
 	{
 		return m_size_x;
 	}
@@ -268,8 +268,22 @@ public:
 	}
 
 	/*
-	defines an accessor with signed indices
+	define accessors with signed indices
 	*/
+	T getRelValue(int relx, int rely, int relz)const
+	{
+		int shift = (int)(m_size_x / 2);
+		int index = (relx + shift)*m_size_y*m_size_z + (rely + shift)*m_size_z + (relz + shift);
+		assert(index >= 0 && index < m_size_x*m_size_x*m_size_z);
+		return m_data[index];
+	}
+	void setRelValue(int relx, int rely, int relz, float value)
+	{
+		int shift = (int)(m_size_x / 2);
+		int index = (relx + shift)*m_size_y*m_size_z + (rely + shift)*m_size_z + (relz + shift);
+		assert(index >= 0 && index < m_size_x*m_size_x*m_size_z);
+		m_data[index] = value;
+	}
 	virtual T& operator()(int relx, int rely, int relz)
 	{
 		int shift = (int)(m_size_x / 2);

@@ -41,7 +41,7 @@ int main(int argc, char** argv)
 	}
 
 	params.diff_a = 2 * diff; 
-	params.diff_b = diff;
+	params.diff_b = 0.5*diff;
 
 	
 
@@ -54,7 +54,7 @@ int main(int argc, char** argv)
 	//Field3D<float> density_field = getField<float>(file_name_density);
 	
 	//int box_size = density_field.sizeX();
-	int box_size = 30;
+	int box_size = 100;
 	cout << endl << "BOX SIZE : " << box_size << endl<<endl;
 
 	/*---------------------------
@@ -65,11 +65,12 @@ int main(int argc, char** argv)
 	float radius = ((float)box_size) / 8.0;//radius of the balls
 	float init_level_a = 0.5;//initial level of A where it exists
 	float init_level_b = 0.5; //initial level of B where it exists
-	float epsilon = 0.1; //noise
+	float epsilon = 0.1; //noise level
 
 	
 	Field3D<float> init_field_a(box_size);
 	init_field_a.initElements(init_level_a);
+
 	Field3D<float> init_field_b(box_size);
 	init_field_b.initElements(init_level_b);
 
@@ -101,7 +102,7 @@ int main(int argc, char** argv)
 							VTK RENDRING PIPELINE
 -----------------------------------------------------------------------------------*/
 
-	int T = 90; //total period of animation / evolution
+	int T = 7200; //total period of animation / evolution
 
 	vtkSmartPointer<vtkRenderer> renderer = vtkSmartPointer<vtkRenderer>::New();
 	vtkSmartPointer<vtkRenderWindow> ren_win = vtkSmartPointer<vtkRenderWindow>::New();
@@ -128,7 +129,7 @@ int main(int argc, char** argv)
 
 	ChemicalSystem chem_sys(box_size);
 	chem_sys.initialize(init_field_a, init_field_b);
-	//chem_sys.setKernel(laplacianKernel(0.6));
+	chem_sys.setKernel(laplacianKernel(0.6));
 
 	vtkSmartPointer<vtkAnnimationCueObserver> observer = vtkSmartPointer<vtkAnnimationCueObserver>::New();
 	observer->m_ren_win = ren_win;

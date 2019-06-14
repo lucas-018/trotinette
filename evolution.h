@@ -37,12 +37,6 @@ struct Parameters
 
 
 
-
-
-
-
-
-
 class ChemicalSystem
 {
 private:
@@ -76,10 +70,6 @@ public:
 	
 	void update(float delta_t, int num_steps, Parameters params, vtkRenderer *p_renderer);
 };
-
-
-
-
 
 
 
