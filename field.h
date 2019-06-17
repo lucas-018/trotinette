@@ -46,7 +46,7 @@ public:
 		}
 		else
 		{
-			*m_copies -= 1;
+			*m_copies = *m_copies - 1;
 		}
 	}
 
@@ -242,7 +242,7 @@ public:
 		}
 		else
 		{
-			m_copies -= 1;
+			*m_copies = *m_copies - 1;
 		}
 	}
 
@@ -338,6 +338,11 @@ oriented laplacian kernel to increase the diffusion accross one axis in particul
 */
 Kernel3D<float> laplacianLikeKernel(Eigen::Vector3f sigmas, Eigen::Vector3f orientation);
 
+
+
+
+long getUnfoldIndex(int ix, int iy, int iz, int size_x, int size_y, int size_z);
+long getUnfoldIndex(int ix, int iy, int iz, int size);
 
 
 /*

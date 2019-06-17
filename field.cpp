@@ -217,6 +217,22 @@ Kernel3D<float> laplacianLikeKernel(Vector3f sigmas, Vector3f orientation)
 
 
 
+
+long getUnfoldIndex(int ix, int iy, int iz, int size_x, int size_y, int size_z)
+{
+	return min(max(ix, 0), size_x - 1)*size_y*size_z + min(max(iy, 0), size_y - 1)*size_z + min(max(iz, 0), size_z - 1);
+}
+
+
+long getUnfoldIndex(int ix, int iy, int iz, int size)
+{
+	return getUnfoldIndex(ix, iy, iz, size, size, size);
+}
+
+
+
+
+
 /*
 float* element_at(float* origin, int ix, int iy, int iz, int size_x, int size_y, int size_z)
 {
@@ -253,7 +269,7 @@ return origin + ind_x*size_y*size_z + ind_y*size_z + ind_z;
 
 float* element_at(float* origin, int ix, int iy, int iz, int size_x, int size_y, int size_z)
 {
-	return origin + min(max(0, ix), size_x - 1)*size_y*size_z + min(max(0, iy), size_y - 1)*size_z + min(max(0, iz), size_z - 1);
+	return origin + getUnfoldIndex(ix, iy, iz, size_x, size_y, size_z);
 }
 
 float* element_at(float* origin, int ix, int iy, int iz, int size)

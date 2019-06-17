@@ -2,12 +2,19 @@
 #define DEF_GENERATOR
 #pragma once
 
+#define _CRTDBG_MAP_ALLOC
+#include <stdlib.h>
+#include <crtdbg.h>
+
 
 #include <iostream>
 #include <vector>
 #include <map>
 #include "Eigen/Dense"
 #include "field.h"
+
+typedef Eigen::SparseMatrix<float, Eigen::ColMajor, long> SpMat;
+
 
 class Generator
 {
@@ -29,6 +36,7 @@ private:
 	Field3D<float> m_feed;
 public:
 	GrayScottGenerator(float t_diff_a, float t_diff_b, float t_kill, const Field3D<float>& t_feed);
+	~GrayScottGenerator();
 	float diffA()const;
 	float diffB()const;
 	float kill()const;
@@ -59,12 +67,10 @@ private:
 	float m_kill;
 	float m_delta_t;
 	Field3D<float> m_feed;
-	Eigen::SparseMatrix<float> m_left_matrix_a;
-	Eigen::SparseMatrix<float> m_left_matrix_b;
-	Eigen::SparseMatrix<float> m_right_matrix_a;
-	Eigen::SparseMatrix<float> m_right_matrix_b;
-	Eigen::ConjugateGradient<Eigen::SparseMatrix<float>, Eigen::Lower | Eigen::Upper> m_solver_a;
-	Eigen::ConjugateGradient<Eigen::SparseMatrix<float>, Eigen::Lower | Eigen::Upper> m_solver_b;
+	SpMat m_left_matrix_a;
+	SpMat m_left_matrix_b;
+	Eigen::ConjugateGradient<SpMat, Eigen::Lower | Eigen::Upper> m_solver_a;
+	Eigen::ConjugateGradient<SpMat, Eigen::Lower | Eigen::Upper> m_solver_b;
 	int m_max_iter;
 public:
 	GrayScottSG(float t_diff_a, float t_diff_b, float t_kill, const Field3D<float>& t_feed, bool t_is_explicit);
@@ -73,6 +79,7 @@ public:
 	void setMaxIterations(int t_max_iter);
 	void setKernel(const Kernel3D<float>& kernel);
 	Kernel3D<float> getKernel()const;
+	std::vector<Eigen::VectorXf> getRightMembers(const std::vector<Eigen::VectorXf>& former_state_vecs)const;
 	void buildMatrices();
 	void explicitScheme(const std::vector<float*>& former_state, std::vector<float*>& new_state)const;
 	void crankNicolsonScheme(const std::vector<float*>& former_state, std::vector<float*>& new_state)const;
@@ -82,6 +89,6 @@ public:
 
 
 
-Eigen::SparseMatrix<float> laplacian3DMatrix(int size, const Kernel3D<float>& kernel);
+SpMat laplacian3DMatrix(int size, const Kernel3D<float>& kernel);
 
 #endif

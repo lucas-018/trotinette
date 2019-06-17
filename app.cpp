@@ -1,5 +1,9 @@
+
+
 #include "evolution.h"
 #include "file_manager.h"
+
+
 
 using namespace std;
 using namespace Eigen;
@@ -34,10 +38,10 @@ int main(int argc, char** argv)
 	}
 	else
 	{
-		delta_t = 0.1;
-		float diff = 0.041;
-		feed_default_value = 0.048;
-		params.kill = 0.064;
+		delta_t = 5;
+		diff = 0.041;
+		feed_default_value = 0.055;
+		params.kill = 0.062;
 	}
 
 	params.diff_a = 2 * diff; 

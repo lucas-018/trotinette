@@ -19,6 +19,11 @@ GrayScottGenerator::GrayScottGenerator(float t_diff_a, float t_diff_b, float t_k
 	m_size = t_feed.sizeX();
 }
 
+GrayScottGenerator::~GrayScottGenerator()
+{
+
+}
+
 
 float GrayScottGenerator::diffA()const
 {
@@ -104,7 +109,7 @@ GrayScottSG::GrayScottSG(float t_diff_a, float t_diff_b, float t_kill, const Fie
 	m_feed(t_feed),
 	m_delta_t(1.0f),
 	m_is_explicit(t_is_explicit),
-	m_max_iter(100)
+	m_max_iter(10)
 {
 	m_generator = new GrayScottGenerator(t_diff_a, t_diff_b, t_kill, t_feed);
 	this->setKernel(laplacianKernel(0.6f));
@@ -140,16 +145,64 @@ Kernel3D<float> GrayScottSG::getKernel()const
 }
 
 
+vector<VectorXf> GrayScottSG::getRightMembers(const vector<VectorXf>& former_state_vecs)const
+{
+	int size = m_generator->size();
+	VectorXf right_member_a(size*size*size);
+	VectorXf right_member_b(size*size*size);
+	Kernel3D<float> kernel = this->getKernel();
+	int start = kernel.startIndex();
+	int stop = kernel.stopIndex();
+	for (int ix = 0; ix < size; ++ix)
+	{
+		for (int iy = 0; iy < size; ++iy)
+		{
+			for (int iz = 0; iz < size; ++iz)
+			{
+				long index = getUnfoldIndex(ix, iy, iz, size);
+
+				float former_value_a = former_state_vecs[0][index];
+				float former_value_b = former_state_vecs[1][index];
+
+				float right_member_value_a = former_value_a;
+				float right_member_value_b = former_value_b;
+				for (int relx = start; relx < stop; ++relx)
+				{
+					for (int rely = start; rely < stop; ++rely)
+					{
+						for (int relz = start; relz < stop; ++relz)
+						{
+							long index_neighbour = getUnfoldIndex(ix + relx, iy + rely, iz + relz, size);
+							right_member_value_a += 0.5f*m_diff_a*m_delta_t*former_state_vecs[0][index_neighbour] * kernel(relx, rely, relz) * 6;
+							right_member_value_b += 0.5f*m_diff_b*m_delta_t*former_state_vecs[1][index_neighbour] * kernel(relx, rely, relz) * 6;
+						}
+					}
+				}
+				float interaction = former_value_a*former_value_b*former_value_b;
+				right_member_value_a += m_delta_t*(-interaction) + m_delta_t*m_feed.getValue(ix, iy, iz)*(1.0f - 0.5f*former_value_a);
+				right_member_value_b += m_delta_t*interaction - m_delta_t*0.5f*(m_feed.getValue(ix, iy, iz) + m_kill)*former_value_b;
+				
+				right_member_a[index] = right_member_value_a;
+				right_member_b[index] = right_member_value_b;
+			}
+		}
+	}
+	vector<VectorXf> right_members;
+	right_members.push_back(right_member_a);
+	right_members.push_back(right_member_b);
+	return right_members; 
+}
+
+
+
 void GrayScottSG::buildMatrices()
 {
 	int size = m_generator->size();
-	SparseMatrix<float> laplacian_matrix = laplacian3DMatrix(size, this->getKernel());
+	SpMat laplacian_matrix = laplacian3DMatrix(size, this->getKernel());
 
-	m_left_matrix_a = -0.5*m_delta_t*m_diff_a*laplacian_matrix;
-	m_left_matrix_b = -0.5*m_delta_t*m_diff_b*laplacian_matrix;
+	m_left_matrix_a = -0.5f*m_delta_t*m_diff_a*laplacian_matrix;
+	m_left_matrix_b = -0.5f*m_delta_t*m_diff_b*laplacian_matrix;
 
-	m_right_matrix_a = 0.5*m_delta_t*m_diff_a*laplacian_matrix;
-	m_right_matrix_b = 0.5*m_delta_t*m_diff_b*laplacian_matrix;
 
 	for (int k = 0; k < size*size*size; ++k)
 	{
@@ -160,8 +213,6 @@ void GrayScottSG::buildMatrices()
 		m_left_matrix_a.coeffRef(k, k) += 0.5f*m_delta_t*m_feed(x_pos, y_pos, z_pos) + 1.0f;
 		m_left_matrix_b.coeffRef(k, k) += 0.5f*m_delta_t*(m_feed(x_pos, y_pos, z_pos) + m_kill) + 1.0f;
 
-		m_right_matrix_a.coeffRef(k, k) += -0.5f*m_delta_t*m_feed(x_pos, y_pos, z_pos) + 1.0f;
-		m_right_matrix_b.coeffRef(k, k) += -0.5f*m_delta_t*(m_feed(x_pos, y_pos, z_pos) + m_kill) + 1.0f;
 	}
 
 	m_solver_a.compute(m_left_matrix_a);
@@ -213,13 +264,18 @@ void GrayScottSG::crankNicolsonScheme(const vector<float*>& former_state, vector
 	}
 	VectorXf interaction = m_delta_t*former_a.cwiseProduct(former_b).cwiseProduct(former_b);
 
-	VectorXf right_member_a = m_right_matrix_a*former_a - interaction + offset_a;
-	VectorXf right_member_b = m_right_matrix_b*former_b + interaction;
+	vector<VectorXf> former_state_vecs;
+	former_state_vecs.push_back(former_a);
+	former_state_vecs.push_back(former_b);
+
+	vector<VectorXf> right_members = this->getRightMembers(former_state_vecs);
 
 
-	VectorXf new_a = m_solver_a.solveWithGuess(right_member_a, former_a);//TO DO : Try "right_member_a" as a guess
+	VectorXf new_a = m_solver_a.solveWithGuess(right_members[0], former_a);//TO DO : Try "right_member_a" as a guess
 
-	VectorXf new_b = m_solver_b.solveWithGuess(right_member_b, former_b);//TO DO : Try "right_member_b" as a guess
+	VectorXf new_b = m_solver_b.solveWithGuess(right_members[1], former_b);//TO DO : Try "right_member_b" as a guess
+
+	cout << "Iterations:  (a = " << m_solver_a.iterations() << "  |  b = " << m_solver_b.iterations() << ")" << endl << endl;
 
 	for (int ix = 0; ix < size; ++ix)
 	{
@@ -250,15 +306,15 @@ void GrayScottSG::operate(const vector<float*>& former_state, vector<float*>& ne
 }
 
 
-SparseMatrix<float> laplacian3DMatrix(int size, const Kernel3D<float>& kernel)
+SpMat laplacian3DMatrix(int size, const Kernel3D<float>& kernel)
 {
 	int kernel_size = kernel.size();
-	VectorXi reserve_vector = (kernel_size*kernel_size*kernel_size)*VectorXi::Ones(size*size*size);
-	SparseMatrix<float> laplacian(size*size*size, size*size*size);
+	VectorXi reserve_vector = VectorXi::Constant(size*size*size, kernel_size*kernel_size*kernel_size);
+	SpMat laplacian(size*size*size, size*size*size);
 	int start = kernel.startIndex();
 	int stop = kernel.stopIndex();
 	laplacian.reserve(reserve_vector);
-	for (int k = 0; k < size*size*size; ++k)
+	for (long k = 0; k < size*size*size; ++k)
 	{
 		int x_pos = (int)(k / size / size);
 		int y_pos = (int)((k - x_pos*size*size) / size);
@@ -269,7 +325,7 @@ SparseMatrix<float> laplacian3DMatrix(int size, const Kernel3D<float>& kernel)
 			{
 				for (int relz = start; relz < stop; ++relz)
 				{
-					int index = min(max(x_pos + relx, 0), size - 1)*size*size + min(max(y_pos + rely, 0), size - 1)*size + min(max(z_pos + relz, 0), size - 1);
+					long index = min(max(x_pos + relx, 0), size - 1)*size*size + min(max(y_pos + rely, 0), size - 1)*size + min(max(z_pos + relz, 0), size - 1);
 					laplacian.coeffRef(k, index) += kernel.getRelValue(relx, rely, relz)*6;
 				}
 			}
