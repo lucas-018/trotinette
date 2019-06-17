@@ -258,7 +258,7 @@ SparseMatrix<float> laplacian3DMatrix(int size, const Kernel3D<float>& kernel)
 	int start = kernel.startIndex();
 	int stop = kernel.stopIndex();
 	laplacian.reserve(reserve_vector);
-	for (int k = 0; k < size; ++k)
+	for (int k = 0; k < size*size*size; ++k)
 	{
 		int x_pos = (int)(k / size / size);
 		int y_pos = (int)((k - x_pos*size*size) / size);
@@ -270,8 +270,7 @@ SparseMatrix<float> laplacian3DMatrix(int size, const Kernel3D<float>& kernel)
 				for (int relz = start; relz < stop; ++relz)
 				{
 					int index = min(max(x_pos + relx, 0), size - 1)*size*size + min(max(y_pos + rely, 0), size - 1)*size + min(max(z_pos + relz, 0), size - 1);
-					laplacian.coeffRef(k, index) += kernel.getRelValue(relx, rely, relz);
-					laplacian.
+					laplacian.coeffRef(k, index) += kernel.getRelValue(relx, rely, relz)*6;
 				}
 			}
 		}
